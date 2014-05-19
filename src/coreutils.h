@@ -3,6 +3,7 @@
  * 常用的核心函数
  * 已合并 on May 18, 2014
  */
+int toRight();
 
 // 获取自然光，返回自然光的值
 int getNL(int sensorPin, int irPin)
@@ -77,7 +78,7 @@ bool barrier()
 /* 超车模块，当检测到车前方有障碍物时向左转，绕过障碍物。
    返回 0 */
 bool rotating = true;
-bool changeToLeft = true;
+bool changeToLeft = false;
 bool changeToRight = false;
 bool overtook = false;
 int tmpRB;
@@ -87,7 +88,7 @@ int func_overtake()
 	while (!overtook) {
 		if (rotating) {
 			// 状态：在障碍物后面调整车身姿态，准备换到左车道
-			motor(LEFT, FORWARD, HALF_SPEED);
+			motor(LEFT, FORWARD, 0);
 			motor(RIGHT, FORWARD, STD_SPEED_R);
 
 			if (getSensor(SENSOR_FORWARD, IRLED_FORWARD) < FORWARD_TOO_FAR) {
@@ -96,9 +97,11 @@ int func_overtake()
 				changeToLeft = true;
 			} else {
 				rotating = true;
+				changeToLeft = false;
 			}
 		} else if (!rotating && changeToLeft) {
 			// 状态：换往左车道
+			digitalWrite(LED, HIGH); // debug
 			delay(100);
 			motor(LEFT, FORWARD, STD_SPEED_L);
 			motor(RIGHT, FORWARD, STD_SPEED_R);
@@ -116,7 +119,7 @@ int func_overtake()
 			}
 		} else if (!changeToLeft && forwardOnLeft) {
 			// 状态：在左车道直行，最后回到右车道
-			// toRight();
+			toRight();
 			
 			if (getSensor(SENSOR_FORWARD, IRLED_FORWARD) > FORWARD_CRITICAL) {
 				// 当右转到遇到右边的墙壁时，左转成遇道路平行
@@ -129,7 +132,12 @@ int func_overtake()
 			// 已经右转到右边的墙壁，将车身调节成与墙壁平行
 			motor(LEFT, FORWARD, 0);
 			motor(RIGHT, FORWARD, STD_SPEED_R);
-		} else if (getSensor(SENSOR_FORWARD, IRLED_FORWARD) < FORWARD_TOO_FAR) {
+		}
+		
+		if (
+			(!forwardOnLeft && changeToRight) &&
+			(getSensor(SENSOR_FORWARD, IRLED_FORWARD) < FORWARD_TOO_FAR)
+			) {
 			// 退出超车模式
 			overtook = true;
 		}

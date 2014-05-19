@@ -26,7 +26,7 @@
 
 #define STD_DST_RF 100	// 标准距离
 #define STD_DST_RB 100
-#define STD_DST_FORWARD 30 // 用于超车的标准距离
+#define STD_DST_FORWARD 48 // 用于启动超车的标准距离
 
 #define STD_SPEED_L 255
 #define STD_SPEED_R 250
@@ -44,5 +44,5 @@
 #define K_SPEED 15 // 速度的系数
 
 // func_overtake() 所用到的数据
-#define FORWARD_TOO_FAR 46 // 车身自转时，逆时针到角度最大时前灯的强度
-#define FORWARD_CRITICAL 70 // 超车完回到右车道时，遇到右墙壁的强度。70 是纸箱测得的强度
+#define FORWARD_TOO_FAR 30 // 车身自转时，逆时针到角度最大时前灯的强度
+#define FORWARD_CRITICAL 48 // 超车完回到右车道时，遇到右墙壁的强度。

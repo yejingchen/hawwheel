@@ -30,20 +30,7 @@ void setup()
 
 void loop()
 {
-	//toRight();
-//	digitalWrite(LED, LOW);
-//	motor(LEFT, FORWARD, STD_SPEED_L);
-//	motor(RIGHT, FORWARD, STD_SPEED_R);
-//	delay(2000);
-
-//	digitalWrite(LED, HIGH);
-//	motor(LEFT, BACK, STD_SPEED_L);
-//	motor(RIGHT, FORWARD, STD_SPEED_R);
-//	delay(2000);
-
-	if (getSensor(SENSOR_FORWARD, IRLED_FORWARD) > STD_DST_FORWARD) {
-		func_overtake();
-	}
+	if (barrier()) func_overtake();
 
 	toRight();
 
