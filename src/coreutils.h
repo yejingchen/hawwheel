@@ -1,16 +1,20 @@
 /*
  * coreutils.h
  * 常用的核心函数
- * 已合并 on May 18, 2014
+ * 已合并 on May 23, 2014
+ * Final version
  */
+
 int toRight();
+void toRight_back();
+boolean toRight_slow();
 
 // 获取自然光，返回自然光的值
 int getNL(int sensorPin, int irPin)
 {
 	int ret;
 	digitalWrite(irPin,0);
-	delay(2);
+	delayMicroseconds(50);
 	ret = analogRead(sensorPin);
 	digitalWrite(irPin,1);
 	return ret;
@@ -22,23 +26,16 @@ inline void turnOffthelight()
 	{
 	    digitalWrite(i, 0);
 	}
-	delay(1);
+	delayMicroseconds(50);
 }
 
 // 获取传感器的状态，返回已减去自然光的传感值
 inline int getSensor(int sensorPin, int irPin)
 {
-	int ret = 0;
 	turnOffthelight();
 	int NL = getNL(sensorPin, irPin);
-	delay(1);
-	for (int i=0;i<=5;i++)
-	{
-		ret += NL - analogRead(sensorPin);
-		delay(1);
-	}
-	
-	return ret/6;
+	delayMicroseconds(50);
+	return NL - analogRead(sensorPin);
 }
 
 // 控制车轮速度、方向
@@ -54,29 +51,31 @@ void motor(boolean left, boolean forward, int speed)
 		digitalWrite(MR_DIR, forward);
 		analogWrite(MR_SPEED, speed);
 	}
-} 
+}
 
 // 遇障停车的主函数，当车前方检测到障碍，即停下。与超车函数不兼容
-int stopForwardObstacle()
+int stop()
 {
 	motor(LEFT, FORWARD, 0);
 	motor(RIGHT, FORWARD, 0);
-	Serial.println("Left right motor stopped!");
 
 	return 0;
 }
 
 // 检测是否有障碍物，返回 true 当前方有障碍物，否则返回 false
-bool barrier()
+inline bool forward_barrier()
 {
-	if (getSensor(SENSOR_FORWARD, IRLED_FORWARD) > STD_DST_FORWARD)
-		return true;
-	else 
-		return false;
+	return (getSensor(SENSOR_FORWARD, IRLED_FORWARD) > STD_DST_FORWARD);
 }
 
-/* 超车模块，当检测到车前方有障碍物时向左转，绕过障碍物。
-   返回 0 */
+inline bool up_red()
+{
+	return (analogRead(SENSOR_UP) < RED_LIGHT);
+}
+
+// 超车模块，当检测到车前方有障碍物时向左转，绕过障碍物。
+// 在整个 loop() 中只运行一次
+// 返回 0
 bool rotating = true;
 bool changeToLeft = false;
 bool changeToRight = false;
@@ -85,6 +84,13 @@ int tmpRB;
 bool forwardOnLeft;
 int func_overtake()
 {
+	// Initializaing
+	rotating = true;
+	changeToLeft = false;
+	changeToRight = false;
+	overtook = false;
+	digitalWrite(LED, HIGH); // debug
+
 	while (!overtook) {
 		if (rotating) {
 			// 状态：在障碍物后面调整车身姿态，准备换到左车道
@@ -101,8 +107,7 @@ int func_overtake()
 			}
 		} else if (!rotating && changeToLeft) {
 			// 状态：换往左车道
-			digitalWrite(LED, HIGH); // debug
-			delay(100);
+			delay(50);
 			motor(LEFT, FORWARD, STD_SPEED_L);
 			motor(RIGHT, FORWARD, STD_SPEED_R);
 
@@ -144,6 +149,7 @@ int func_overtake()
 
 	} // while end 
 
+	digitalWrite(LED, LOW);
 	return 0;
 }
 
@@ -155,120 +161,174 @@ float SP_L = STD_SPEED_L;
 float SP_R = STD_SPEED_R;
 int toRight()
 {
-	// 把 //Serial 替换成 Serial 来取消串口通信的注释
 	// RF_shift: 离墙壁越近，数值越大
 	RF_shift = (getSensor(SENSOR_RF, IRLED_RF) - STD_DST_RF) / STD_JITTER;
 	RB_shift = (getSensor(SENSOR_RB, IRLED_RB) - STD_DST_RB) / STD_JITTER;
 
-	// 综合 SENSOR_RF 和 SENSOR_RB 的数据来判断何时转弯
-	// 很多 if 的版本
+	SP_L = STD_SPEED_L;
+	SP_R = STD_SPEED_R;
 
 	if (RB_shift - RF_shift > 0)
 	{
 		if (RB_shift < 0)
 		{
 			// 此时车头、车尾都离墙较远，且车头偏向左，应向右转
-			//Serial.println("Turn right");
-			//Serial.print("B-F: ");
-			//Serial.println(RB_shift - RF_shift);
-			//Serial.print("B: ");
-			//Serial.print(RB_shift);
-			//Serial.print("    F: ");
-			//Serial.println(RF_shift);
-			SP_R = STD_SPEED_R + RF_shift*K_SPEED;
-			//analogWrite(MR_SPEED, STD_SPEED_R - (RB_shift + RF_shift)*1.5); //右轮减速
+			SP_R = 70;
 		} 
-		else 
-		{
-			//Serial.println("keep");
-			//Serial.print("B-F: ");
-			//Serial.println(RB_shift - RF_shift);
-			//Serial.print("B: ");
-			//Serial.print(RB_shift);
-			//Serial.print("    F: ");
-			//Serial.println(RF_shift);
-			SP_R = STD_SPEED_R;
-			SP_L = STD_SPEED_L;
-
-		}
 	} 
 	else if (RB_shift - RF_shift < 0)
 	{
 		if (RF_shift >= 0) 
 		{
 			// 此时车头离墙较近，且车头偏向右，应向左转 
-			//Serial.println("Turn left");
-			//Serial.print("B-F: ");
-			//Serial.println(RB_shift - RF_shift);
-			//Serial.print("B: ");
-			//Serial.print(RB_shift);
-			//Serial.print("    F: ");
-			//Serial.println(RF_shift);
-			SP_L = STD_SPEED_L - RF_shift*K_SPEED;
-			//analogWrite(ML_SPEED, STD_SPEED_L + (RB_shift - RF_shift)*1.5); //左轮减速
+			SP_L = 70;
 		} 
-		else 
-		{
-			//Serial.println("keep");
-			//Serial.print("B-F: ");
-			//Serial.println(RB_shift - RF_shift);
-			//Serial.print("B: ");
-			//Serial.print(RB_shift);
-			//Serial.print("    F: ");
-			//Serial.println(RF_shift);
-			SP_R = STD_SPEED_R;
-			SP_L = STD_SPEED_L;
-		}
 	} 
-	else if (RF_shift == RB_shift)
+	else
 	{
 		if (RB_shift > 0) 
 		{
 			// 车头直向前，且车离墙较近，应向左转
-			//Serial.println("Turn left");
-			//Serial.print("B-F: ");
-			//Serial.println(RB_shift - RF_shift);
-			//Serial.print("B: ");
-			//Serial.print(RB_shift);
-			//Serial.print("    F: ");
-			//Serial.println(RF_shift);
-			SP_L = STD_SPEED_L - (RF_shift)*K_SPEED;
-			//analogWrite(ML_SPEED, STD_SPEED_L - (RF_shift)*1.5); //左轮减速
+			SP_L = 70;
 		} 
 		else if (RB_shift < 0) 
 		{
 			// 车头直向前，且车离墙较远，应向右转 
-			//Serial.println("Turn right");
-			//Serial.print("B-F: ");
-			//Serial.println(RB_shift - RF_shift);
-			//Serial.print("B: ");
-			//Serial.print(RB_shift);
-			//Serial.print("    F: ");
-			//Serial.println(RF_shift);
-			SP_R = STD_SPEED_R + (RF_shift)*K_SPEED;
-			//analogWrite(MR_SPEED, STD_SPEED_R + (RF_shift)*1.5); //右轮减速
+			SP_R = 70;
 		} 
-		else 
-		{
-			//Serial.println("keep");
-			//Serial.print("B-F: ");
-			//Serial.println(RB_shift - RF_shift);
-			//Serial.print("B: ");
-			//Serial.print(RB_shift);
-			//Serial.print("    F: ");
-			//Serial.println(RF_shift);
-			SP_R = STD_SPEED_R;
-			SP_L = STD_SPEED_L;
-		}
 	}
-
-	//Serial.print("L : ");
-	//Serial.print(SP_L);
-	//Serial.print("     R : ");
-	//Serial.println(SP_R);
-	//Serial.println("\n---------------------------\n");
 
 	analogWrite(ML_SPEED, SP_L);
 	analogWrite(MR_SPEED, SP_R);
-	// delay(500);
+	if (SP_L == 70) return 1;
+	return 0;
+}
+
+boolean toRight_slow()
+{
+	// RF_shift: 离墙壁越近，数值越大
+	RF_shift = (getSensor(SENSOR_RF, IRLED_RF) - STD_DST_RF - 30) / STD_JITTER;
+	RB_shift = (getSensor(SENSOR_RB, IRLED_RB) - STD_DST_RB - 30) / STD_JITTER;
+
+	SP_L = STD_SPEED_L_SLOW;
+	SP_R = STD_SPEED_R_SLOW;
+
+
+	if (RB_shift - RF_shift > 0)
+	{
+		if (RB_shift < 0)
+		{
+			// 此时车头、车尾都离墙较远，且车头偏向左，应向右转
+			SP_R = 20;
+		} 
+	} 
+	else if (RB_shift - RF_shift < 0)
+	{
+		if (RF_shift - RB_shift < 2) SP_R = 20;
+		else if (RF_shift >= 0) 
+		{
+			// 此时车头离墙较近，且车头偏向右，应向左转 
+			SP_L = 20;
+		}
+		
+	} 
+	else
+	{
+		if (RB_shift > 0) 
+		{
+			// 车头直向前，且车离墙较近，应向左转
+			SP_L = 20;
+		} 
+		else if (RB_shift < 0) 
+		{
+			// 车头直向前，且车离墙较远，应向右转 
+			SP_R = 20;
+		} 
+	}
+	analogWrite(ML_SPEED, SP_L);
+	analogWrite(MR_SPEED, SP_R);
+
+	if (SP_L == 20) return 1;
+	return 0;
+}
+
+boolean ifbarn()
+{
+	if (getSensor(SENSOR_BARN, IRLED_FORWARD) < STD_SLOWBAR)
+	{
+		analogWrite(ML_SPEED, STD_SPEED_L);
+		analogWrite(MR_SPEED, STD_SPEED_R);
+
+		return 1;
+	}
+	return 0;
+}
+
+void pullup()
+{
+
+	while (1)
+	{
+		if (getSensor(SENSOR_RF, IRLED_RF) < STD_FINDBARN && getSensor(SENSOR_RB, IRLED_RB) < STD_FINDBARN) break;
+	}
+
+	while(1)
+	{
+		if (getSensor(SENSOR_RF, IRLED_RF) > STD_FINDBARN && getSensor(SENSOR_RB, IRLED_RB) > STD_FINDBARN) break;
+	}
+
+	while (1)
+	{
+		if (toRight_slow()) break;
+		else if (getSensor(SENSOR_RF, IRLED_RF) > STD_DST_RF)
+		{
+			analogWrite(ML_SPEED, 0);
+			analogWrite(MR_SPEED, STD_SPEED_R_SLOW - 30);
+			while (1)
+			{
+				if (getSensor(SENSOR_RB, IRLED_RB) > STD_DST_RB) goto outside;
+			}
+		}
+	}
+
+outside:
+
+	digitalWrite(ML_DIR, BACK);
+	digitalWrite(MR_DIR, BACK);
+	
+	while(1) {
+		toRight_back();
+		// if (getSensor(SENSOR_BACK, IRLED_FORWARD) > 80) break;
+	}
+	analogWrite(ML_SPEED, 0);
+	analogWrite(MR_SPEED, 0);
+
+	while (1);
+}
+
+void toRight_back()
+{
+	RF_shift = (getSensor(SENSOR_RF, IRLED_RF) - STD_DST_RF) / STD_JITTER;
+	RB_shift = (getSensor(SENSOR_RB, IRLED_RB) - STD_DST_RB) / STD_JITTER;
+
+	SP_L = STD_SPEED_L_SLOW;
+	SP_R = STD_SPEED_R_SLOW;
+
+	if (RB_shift - RF_shift > 0)
+	{
+		if (RB_shift >= 0) SP_L = 40;
+	}
+	if (RB_shift - RF_shift < 0)
+	{
+		if (RB_shift <= 0) SP_R = 40;
+	}
+	else
+	{
+		if (RB_shift > 0) SP_L = 40;
+		else if (RB_shift < 0) SP_R = 40;
+	}
+
+
+	analogWrite(ML_SPEED, SP_L);
+	analogWrite(MR_SPEED, SP_R);
 }

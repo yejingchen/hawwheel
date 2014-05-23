@@ -1,6 +1,6 @@
 /*
  * hawwheel.ino
- * 没什么好合并的 on May 18, 2014
+ * 已合并 on May 23, 2014
  */
 
 #include "defines.h"
@@ -30,8 +30,13 @@ void setup()
 
 void loop()
 {
-	if (barrier()) func_overtake();
-
-	toRight();
-
+	if (ifbarn())  {
+		pullup();
+	} else if (forward_barrier()) {
+		stop();
+	} else if (up_red()) {
+		stop();
+	}
+		
+	else toRight();
 }
